@@ -17,7 +17,7 @@ We use the `httpfs` extension in duckdb to access the remote S3 bucket without e
 We establish a connection to the parquet data which we can then query using familiar dplyr methods, which
 are translated to SQL for duckdb under the hood.
 
-```{r}
+```{r message=FALSE}
 con <- dbConnect(duckdb())
 dbSendQuery(con, "INSTALL httpfs;")
 dbSendQuery(con, "LOAD httpfs;")

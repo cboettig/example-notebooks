@@ -23,26 +23,11 @@ which are translated to SQL for duckdb under the hood.
 ``` r
 con <- dbConnect(duckdb())
 dbSendQuery(con, "INSTALL httpfs;")
-```
-
-    <duckdb_result 9e300 connection=04ba0 statement='INSTALL httpfs;'>
-
-``` r
 dbSendQuery(con, "LOAD httpfs;")
-```
-
-    <duckdb_result c7200 connection=04ba0 statement='LOAD httpfs;'>
-
-``` r
 bucket <- "gbif-open-data-us-east-1"
 path <- "occurrence/2023-02-01/occurrence.parquet/*"
 
 dbSendQuery(con, glue::glue('CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://{bucket}/{path}")'))
-```
-
-    <duckdb_result a2a20 connection=04ba0 statement='CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://gbif-open-data-us-east-1/occurrence/2023-02-01/occurrence.parquet/*")'>
-
-``` r
 gbif <- tbl(con, "gbif")
 ```
 
