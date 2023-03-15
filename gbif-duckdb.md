@@ -1,0 +1,99 @@
+
+``` r
+library(duckdb)
+library(tidyr)
+library(dplyr)
+library(stars)
+library(tmap)
+```
+
+GBIF data is available in parquet partitions from the AWS Open Data
+Registry. We use the most recent monthly snapshot, corresponding to the
+S3 bucket,
+s3://gbif-open-data-us-east-1/occurrence/2023-02-01/occurrence.parquet/.
+duckdb can execute arbitrary SQL queries against this remote data source
+without having to first download a local copy of the data, which is
+around a few hundred GB at present.
+
+We use the `httpfs` extension in duckdb to access the remote S3 bucket
+without ever downloading the full dataset. We establish a connection to
+the parquet data which we can then query using familiar dplyr methods,
+which are translated to SQL for duckdb under the hood.
+
+``` r
+con <- dbConnect(duckdb())
+dbSendQuery(con, "INSTALL httpfs;")
+```
+
+    <duckdb_result 9e300 connection=04ba0 statement='INSTALL httpfs;'>
+
+``` r
+dbSendQuery(con, "LOAD httpfs;")
+```
+
+    <duckdb_result c7200 connection=04ba0 statement='LOAD httpfs;'>
+
+``` r
+bucket <- "gbif-open-data-us-east-1"
+path <- "occurrence/2023-02-01/occurrence.parquet/*"
+
+dbSendQuery(con, glue::glue('CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://{bucket}/{path}")'))
+```
+
+    <duckdb_result a2a20 connection=04ba0 statement='CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://gbif-open-data-us-east-1/occurrence/2023-02-01/occurrence.parquet/*")'>
+
+``` r
+gbif <- tbl(con, "gbif")
+```
+
+Let’s count up species diversity across the GBIF occurrence records. As
+observations can be reported as longitude/latitude pairs at arbitrary
+precision, we can round them off to the nearest degree (or tenth of a
+degree, etc). This provides a convenient mechanism for aggregating
+occurrences into grid cells. To simplify the counting process, I will
+aggregate to genus (avoids a few synonyms, sub-species, and incomplete
+names). For now, let’s also just look at vertebrates, where maybe we
+have some chance that sampling is closer to saturation of local
+diversity and we’re not just looking purely at sampling effort. (That’s
+still a bad assumption I think we’ll see).
+
+``` r
+ds <- gbif |> 
+  filter(phylum == "Chordata") |>
+  mutate(latitude = round(decimallatitude,0L),
+         longitude = round(decimallongitude,0L)) |> 
+  select(class, genus, longitude, latitude) |>
+  distinct() |>
+  count(class, longitude, latitude) |> 
+  replace_na(list(n = 0)) 
+
+bench::bench_time({
+  df <- ds |> collect()
+})
+```
+
+    process    real 
+     10.06m   8.76m 
+
+We now have count data for all vertebrate classes in a conveniently
+sized data.frame. Let’s look at species richness of Amphibians on
+log-scale. It is natural to visualize this as a raster plot in standard
+geospatial plotting tools:
+
+``` r
+r <- df |> na.omit() |> 
+  filter(class=="Amphibia") |> 
+  mutate(logn = log(n)) |> 
+  select(longitude, latitude, logn) |> 
+  stars::st_as_stars(coords=c("longitude", "latitude"))
+st_crs(r) <- st_crs(4326)
+```
+
+``` r
+data(World)
+
+tm_shape(World, projection = "+proj=eck4") + tm_polygons(col="grey80") + 
+  tm_shape(r) + tm_raster(pal=viridisLite::viridis(10))
+```
+
+![](gbif-duckdb_files/figure-commonmark/unnamed-chunk-5-1.png)
