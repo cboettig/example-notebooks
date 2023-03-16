@@ -2,6 +2,12 @@
 format: gfm
 ---
 
+```{r include=FALSE}
+Sys.unsetenv("AWS_ACCESS_KEY_ID")
+Sys.unsetenv("AWS_SECRET_ACCESS_KEY")
+Sys.unsetenv("AWS_EC2_METADATA_DISABLED")
+
+```
 
 ```{r message=FALSE, warning=FALSE}
 library(duckdb)
@@ -18,13 +24,16 @@ We establish a connection to the parquet data which we can then query using fami
 are translated to SQL for duckdb under the hood.
 
 ```{r message=FALSE}
+
 con <- dbConnect(duckdb())
 dbSendQuery(con, "INSTALL httpfs;")
 dbSendQuery(con, "LOAD httpfs;")
+dbSendQuery(con, "SET s3_url_style='path';")
+
 bucket <- "gbif-open-data-us-east-1"
 path <- "occurrence/2023-02-01/occurrence.parquet/*"
-
-dbSendQuery(con, glue::glue('CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://{bucket}/{path}")'))
+q <- glue::glue('CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://{bucket}/{path}")')
+dbSendQuery(con, q)
 gbif <- tbl(con, "gbif")
 ```
 
@@ -36,8 +45,8 @@ Let's count up species diversity across the GBIF occurrence records. As observat
 ```{r cache=TRUE}
 ds <- gbif |> 
   filter(phylum == "Chordata") |>
-  mutate(latitude = round(decimallatitude,0L),
-         longitude = round(decimallongitude,0L)) |> 
+  mutate(latitude = round(decimallatitude,1L),
+         longitude = round(decimallongitude,1L)) |> 
   select(class, genus, longitude, latitude) |>
   distinct() |>
   count(class, longitude, latitude) |> 
@@ -53,18 +62,45 @@ Let's look at species richness of Amphibians on log-scale.  It is natural to
 visualize this as a raster plot in standard geospatial plotting tools:
 
 ```{r}
-r <- df |> na.omit() |> 
+amphibia <- df |> na.omit() |> 
   filter(class=="Amphibia") |> 
   mutate(logn = log(n)) |> 
-  select(longitude, latitude, logn) |> 
-  stars::st_as_stars(coords=c("longitude", "latitude"))
+  select(longitude, latitude, n)
+
+
+
+r <- amphibia |>  stars::st_as_stars(coords=c("longitude", "latitude"))
 st_crs(r) <- st_crs(4326)
+stars::write_stars(r, "amphibians.tif")
+```
+
+```{r include = FALSE}
+# terra version
+terra_r <- terra::rast(amphibia, crs="epsg:4326")
+terra::writeRaster(terra_r, "terra_amphibians.tif", overwrite=TRUE)
 ```
 
 
-```{r warning=FALSE, message=FALSE}
+```{r}
+library(stars)
+library(tmap)
+r <- stars::read_stars("terra_amphibians.tif") 
+
 data(World)
-
-tm_shape(World, projection = "+proj=eck4") + tm_polygons(col="grey80") + 
-  tm_shape(r) + tm_raster(pal=viridisLite::viridis(10))
+tm_shape(World) + tm_polygons() + 
+tm_shape(r) + tm_raster(pal=viridisLite::viridis(100)) + tm_layout(legend.position = c("left","bottom"))
 ```
+
+
+
+```{r}
+library(tmap)
+box <- spData::us_states |> dplyr::filter(NAME == "California") |>st_transform(st_crs(r))
+ca <- r |> st_crop(box)
+
+tm_shape(spData::us_states, bbox = st_bbox(box)) + tm_polygons() + 
+tm_shape(ca) + tm_raster(pal=viridisLite::viridis(100)) + tm_layout(legend.position = c("left","bottom"))
+```
+
+
+

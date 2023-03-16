@@ -24,10 +24,12 @@ which are translated to SQL for duckdb under the hood.
 con <- dbConnect(duckdb())
 dbSendQuery(con, "INSTALL httpfs;")
 dbSendQuery(con, "LOAD httpfs;")
+dbSendQuery(con, "SET s3_url_style='path';")
+
 bucket <- "gbif-open-data-us-east-1"
 path <- "occurrence/2023-02-01/occurrence.parquet/*"
-
-dbSendQuery(con, glue::glue('CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://{bucket}/{path}")'))
+q <- glue::glue('CREATE VIEW gbif AS SELECT * FROM read_parquet("s3://{bucket}/{path}")')
+dbSendQuery(con, q)
 gbif <- tbl(con, "gbif")
 ```
 
@@ -45,8 +47,8 @@ still a bad assumption I think we’ll see).
 ``` r
 ds <- gbif |> 
   filter(phylum == "Chordata") |>
-  mutate(latitude = round(decimallatitude,0L),
-         longitude = round(decimallongitude,0L)) |> 
+  mutate(latitude = round(decimallatitude,1L),
+         longitude = round(decimallongitude,1L)) |> 
   select(class, genus, longitude, latitude) |>
   distinct() |>
   count(class, longitude, latitude) |> 
@@ -58,7 +60,7 @@ bench::bench_time({
 ```
 
     process    real 
-     10.06m   8.76m 
+     13.88m   9.28m 
 
 We now have count data for all vertebrate classes in a conveniently
 sized data.frame. Let’s look at species richness of Amphibians on
@@ -66,19 +68,42 @@ log-scale. It is natural to visualize this as a raster plot in standard
 geospatial plotting tools:
 
 ``` r
-r <- df |> na.omit() |> 
+amphibia <- df |> na.omit() |> 
   filter(class=="Amphibia") |> 
   mutate(logn = log(n)) |> 
-  select(longitude, latitude, logn) |> 
-  stars::st_as_stars(coords=c("longitude", "latitude"))
+  select(longitude, latitude, n)
+
+
+
+r <- amphibia |>  stars::st_as_stars(coords=c("longitude", "latitude"))
 st_crs(r) <- st_crs(4326)
+stars::write_stars(r, "amphibians.tif")
 ```
 
 ``` r
-data(World)
+library(stars)
+library(tmap)
+r <- stars::read_stars("terra_amphibians.tif") 
 
-tm_shape(World, projection = "+proj=eck4") + tm_polygons(col="grey80") + 
-  tm_shape(r) + tm_raster(pal=viridisLite::viridis(10))
+data(World)
+tm_shape(World) + tm_polygons() + 
+tm_shape(r) + tm_raster(pal=viridisLite::viridis(100)) + tm_layout(legend.position = c("left","bottom"))
 ```
 
-![](gbif-duckdb_files/figure-commonmark/unnamed-chunk-5-1.png)
+    stars object downsampled to 1414 by 707 cells. See tm_shape manual (argument raster.downsample)
+
+    Warning in sf::st_is_longlat(shp2): bounding box has potentially an invalid
+    value range for longlat data
+
+![](gbif-duckdb_files/figure-commonmark/unnamed-chunk-7-1.png)
+
+``` r
+library(tmap)
+box <- spData::us_states |> dplyr::filter(NAME == "California") |>st_transform(st_crs(r))
+ca <- r |> st_crop(box)
+
+tm_shape(spData::us_states, bbox = st_bbox(box)) + tm_polygons() + 
+tm_shape(ca) + tm_raster(pal=viridisLite::viridis(100)) + tm_layout(legend.position = c("left","bottom"))
+```
+
+![](gbif-duckdb_files/figure-commonmark/unnamed-chunk-8-1.png)
