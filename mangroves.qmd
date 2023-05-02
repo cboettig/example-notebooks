@@ -14,8 +14,6 @@ library(fasterize)
 library(spData)
 ```
 
-
-
 ```{r}
 india <- spData::world |> filter(name_long == "India")
 box <- st_bbox(india)
@@ -87,8 +85,6 @@ d <- density(as.ppp())
 ```{r}
 ex <- mangroves2015_shp |> head()
 ```
-
-
 
 
 ```{r}
