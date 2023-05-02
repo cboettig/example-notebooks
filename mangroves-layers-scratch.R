@@ -16,6 +16,11 @@ vsi <- paste0("/vsizip//vsicurl/", kba_url, kba_path)
 vect(vsi) |> crop(vect(india)) |> terra::writeVector("kba.json", overwrite=TRUE)
 minio::mc("cp kba.json nvme/biodiversity/india_kba.json")
 
+minio::mc("cp srilanka_kba.json nvme/biodiversity/srilanka_kba.json")
+minio::mc("cp srilanka_mangroves2015.json nvme/biodiversity/srilanka_mangroves2015.json")
+
+
+
 
 
 files <- paste0("GMW_v3_", c(2015:2017, 2019,2020))
@@ -59,6 +64,7 @@ plot(mammals)
 reptiles <- rast("https://minio.carlboettiger.info/biodiversity/REPTILES.tif")
 plot(reptiles)
 
+reef_fish <- read_sf("/vsizip//vsicurl/https://minio.carlboettiger.info/iucn/WRASSES_PARROTFISHES.zip")
 
 amphibians <- rast("https://minio.carlboettiger.info/biodiversity/amphibians.tif")
 plot(amphibians)
@@ -76,3 +82,4 @@ kba_path <- "/KBAsGlobal_2023_March_01_Criteria_TriggerSpecies/KBAsGlobal_2023_M
 
 
 kbas <- sf::read_sf(paste0("/vsizip//vsicurl/", kba_url, kba_path))
+
