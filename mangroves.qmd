@@ -1,0 +1,105 @@
+---
+
+format: html
+
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(tmap)
+library(terra)
+library(sf)
+library(stars)
+library(fasterize)
+library(spData)
+```
+
+
+
+```{r}
+india <- spData::world |> filter(name_long == "India")
+box <- st_bbox(india)
+```
+
+
+```{r}
+
+## Slow: using original complete shapefile with miss-specified geometry.
+
+# sf_use_s2(FALSE)
+# kba_url <- "https://minio.carlboettiger.info/iucn/KBAsGlobal_2023_March_01_Criteria_TriggerSpecies.zip"
+# kba_path <- "/KBAsGlobal_2023_March_01_Criteria_TriggerSpecies/KBAsGlobal_2023_March_01_POL.shp"
+# vsi <- paste0("/vsizip//vsicurl/", kba_url, kba_path)
+# vsi |> sf::read_sf() |> st_crop(india) |> st_make_valid9)
+# sf_use_s2(TRUE)
+
+## pre-cropped to india:
+
+kbas <- "/vsicurl/https://minio.carlboettiger.info/biodiversity/india_kba.json" |>
+  sf::read_sf() |> st_make_valid()
+```
+
+
+```{r}
+library(tmap)
+tmap_options(check.and.fix = TRUE)
+tmap_mode("view")
+
+tm_shape(kbas, bbox = box) + tm_polygons() 
+
+```
+
+```{r}
+mangroves2015 <- read_stars("/vsicurl/https://minio.carlboettiger.info/biodiversity/GMW_v3_2015.tif") |>
+  st_crop(india)
+
+plot(magroves2015)
+
+mangroves2015_shp <- read_sf("/vsicurl/https://minio.carlboettiger.info/biodiversity/GMW_v3_2015.zip") |>
+  st_crop(india)
+```
+
+```{r}
+mangroves2015_shp <- read_sf("/vsizip//vsicurl/https://minio.carlboettiger.info/biodiversity/GMW_v3_2015.zip") |>
+  st_crop(india)
+```
+
+
+```{r}
+tm_shape(mangroves2015_shp) + tm_polygons()
+```
+
+```{r}
+library(spatstat)
+mangroves2015_shp |> st_transform(5234) |> as.
+d <- density(as.ppp())
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+ex <- mangroves2015_shp |> head()
+```
+
+
+
+
+```{r}
+mammals <- terra::rast("https://minio.carlboettiger.info/biodiversity/MAMMALS.tif")
+plot(mammals)
+
+
+reptiles <- terra::rast("https://minio.carlboettiger.info/biodiversity/REPTILES.tif")
+plot(reptiles)
+```
+
+
+
+
