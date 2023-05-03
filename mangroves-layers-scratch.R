@@ -15,6 +15,7 @@ vsi <- paste0("/vsizip//vsicurl/", kba_url, kba_path)
 
 vect(vsi) |> crop(vect(india)) |> terra::writeVector("kba.json", overwrite=TRUE)
 
+minio::mc("cp gbif_richness.tif nvme/biodiversity/gbif_richness.tif")
 
 minio::mc("cp kba.json nvme/biodiversity/india_kba.json")
 

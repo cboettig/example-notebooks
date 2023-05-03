@@ -68,21 +68,40 @@ mangroves2015_shp <- read_sf(paste0("/vsicurl/", biodiversity, "/", "srilanka_ma
 Actual GBIF occurrances
 
 ```{r}
+attach(as.list(box)) # NSE-filter
+
 s3 <- arrow::s3_bucket("biodiversity", endpoint_override="https://minio.carlboettiger.info", anonymous=TRUE)
 gbif <- arrow::open_dataset("gbif_richness")
-gbif_r <- gbif |>
+vertabrate_species_gbif <- gbif |>
+    dplyr::filter(latitude >= {ymin},
+         latitude <= {ymax},
+         longitude >= {xmin},
+         longitude <= {xmax}
+         ) |>
   group_by(longitude, latitude) |> 
   summarise(n = sum(n, na.rm=TRUE)) |> 
   collect() |> 
   tidyr::drop_na()  |>
   stars::st_as_stars(coords=c("longitude", "latitude"))
-st_crs(gbif_r) <- st_crs(4326)
+st_crs(vertabrate_species_gbif) <- st_crs(loc)
 
-gbif_r |> stars::write_stars("gbif_richness.tif")
+```
 
 
+```{r}
+sri_2015_pop <- "https://data.worldpop.org/GIS/Population_Density/Global_2000_2020_1km_UNadj/2015/LKA/lka_pd_2015_1km_UNadj.tif"
+population <- stars::read_stars(paste0(sri_2015_pop))
 
-tm_shape(gbif_r, bbox = loc) + tm_raster()
+priority_areas <- kbas
+mangroves <- mangroves2015_shp 
+```
+
+```{r}
+tm_shape(population) + tm_raster(n = 20, palette = "viridis", 
+                                style="quantile", legend.show=FALSE, alpha=0.4) +
+tm_shape(vertabrate_species_gbif) + tm_raster(alpha=0.5) + 
+tm_shape(priority_areas) + tm_polygons(alpha=0) +
+tm_shape(mangroves) + tm_polygons("darkgreen")
 ```
 
 

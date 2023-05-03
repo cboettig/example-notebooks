@@ -42,16 +42,18 @@ Let's count up species diversity across the GBIF occurrence records. As observat
 
 ```{r}
 bbox <- st_bbox(c(xmin=-180, ymin=-90, xmax=180, ymax=90), crs=4326)
+attach(as.list(bbox)) # NSE-filter
 ```
 
 
 ```{r cache=TRUE}
 ds <- gbif |> 
   filter(phylum == "Chordata") |>
-  filter(decimallatitude >= bbox[["ymin"]],
-         decimallatitude <= bbox[["ymax"]],
-         decimallongitude >= bbox[["xmin"]],
-         decimallongitude <- bbox[["xmax"]]) |>
+  filter(decimallatitude >= {ymin},
+         decimallatitude <= {ymax},
+         decimallongitude >= {xmin},
+         decimallongitude <= {xmax}
+         ) |>
   mutate(latitude = round(decimallatitude,1L),
          longitude = round(decimallongitude,1L)) |> 
   select(class, genus, longitude, latitude) |>
