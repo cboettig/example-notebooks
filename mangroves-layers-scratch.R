@@ -14,12 +14,15 @@ kba_path <- "/KBAsGlobal_2023_March_01_Criteria_TriggerSpecies/KBAsGlobal_2023_M
 vsi <- paste0("/vsizip//vsicurl/", kba_url, kba_path)
 
 vect(vsi) |> crop(vect(india)) |> terra::writeVector("kba.json", overwrite=TRUE)
+
+
 minio::mc("cp kba.json nvme/biodiversity/india_kba.json")
 
 minio::mc("cp srilanka_kba.json nvme/biodiversity/srilanka_kba.json")
 minio::mc("cp srilanka_mangroves2015.json nvme/biodiversity/srilanka_mangroves2015.json")
 
 
+minio::mc("cp -r gbif_richness nvme/biodiversity/")
 
 
 

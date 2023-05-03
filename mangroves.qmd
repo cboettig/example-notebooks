@@ -65,6 +65,28 @@ mangroves2015_shp <- read_sf(paste0("/vsicurl/", biodiversity, "/", "srilanka_ma
 ```
 
 
+Actual GBIF occurrances
+
+```{r}
+s3 <- arrow::s3_bucket("biodiversity", endpoint_override="https://minio.carlboettiger.info", anonymous=TRUE)
+gbif <- arrow::open_dataset("gbif_richness")
+gbif_r <- gbif |>
+  group_by(longitude, latitude) |> 
+  summarise(n = sum(n, na.rm=TRUE)) |> 
+  collect() |> 
+  tidyr::drop_na()  |>
+  stars::st_as_stars(coords=c("longitude", "latitude"))
+st_crs(gbif_r) <- st_crs(4326)
+
+gbif_r |> stars::write_stars("gbif_richness.tif")
+
+
+
+tm_shape(gbif_r, bbox = loc) + tm_raster()
+```
+
+
+Overlapping species distribution polygons
 
 ```{r}
 reef_fish <- read_sf("/vsizip//vsicurl/https://minio.carlboettiger.info/iucn/WRASSES_PARROTFISHES.zip")
@@ -72,7 +94,7 @@ sf_use_s2(FALSE) # Original data has misspecified spherical geometry actually...
 fish <- reef_fish |> st_crop(loc)
 sf_use_s2(TRUE) # Original data has misspecified spherical geometry actually...
 
-st_as_stars(st_bbox(loc), nx = 100, ny = 200, values = 0) |> stars::write_stars("grid.tif")
+st_as_stars(st_bbox(loc), nx = 600, ny = 1200, values = 0) |> stars::write_stars("grid.tif")
 grd <- raster::raster("grid.tif")
 wrasses_richness <- RWmisc::overlap.weight(grd, fish, count = TRUE)
 
