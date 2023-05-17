@@ -1,127 +1,165 @@
 ---
-
+title: Mangroves and Environment in India
 format: html
 
 ---
 
-```{r setup, message=FALSE}
-library(tidyverse)
-library(tmap)
+This is a tutorial showing a cloud-native workflow for spatial data processing.
+
+
+
+# Data access
+
+```{r}
 library(terra)
-library(sf)
+library(gdalcubes)
 library(stars)
-library(fasterize)
-library(spData)
+library(sf)
+library(dplyr)
 library(glue)
-library(RWmisc)
-knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+library(spData)
+```
+
+
+## Spatial vectors
+
+```{r}
+base <- "https://datadownload-production.s3.amazonaws.com"
+y2017 <- "GMW_v3_2017.zip"
+y2020 <- "GMW_v3_2020.zip"
+```
+
+Global Mangrove Watch polygons are stored in rather large zipped shapefiles on AWS.  We can read them in directly over the network, subsetting on the fly to save RAM through use of GDAL's virtual filesystem.  Let's grab the polygons in India for 2017 and 2020.  
+
+```{r}
+library(terra)
+india <- spData::world |> dplyr::filter(name_long == "India") |> vect()
+gmw2017_india <- glue("/vsizip/vsicurl/{base}/{y2017}") |> vect(filter = india)
+gmw2020_india <-glue("/vsizip/vsicurl/{base}/{y2020}") |> vect(filter = india)
+```
+
+We will come back to these in a moment.  (dev note: `sf` version of this filter uses much more RAM)
+
+
+## Spatial Rasters
+
+Raster data like images can also be challenging to work with.  We commonly have to filter through collections with thousands of different files covering the globe at different times, and then tile together dozens or hundreds of individual tif files into a mosaic for a national scale analysis. To do this reproducibly and programmatically, we will search a STAC catalog (essentially a collection of JSON files) to identify which individual tif assets contain the spatial/temporal region of interest, and extract links.  These links are automatically 'signed' to allow secure access -- though in this case the data are freely available, so link signing is only a technique for the database to use rate-limiting to prevent overuse by a single user. 
+
+```{r}
+library(rstac)
+library(gdalcubes)
+box <- spData::world |> dplyr::filter(name_long == "India") |> sf::st_bbox()
+
+matches <-
+  stac("https://planetarycomputer.microsoft.com/api/stac/v1") |>
+  stac_search(collections = "io-biodiversity",
+              bbox = c(box),
+              limit = 1000) |>
+  post_request() |>
+  items_sign(sign_fn = sign_planetary_computer())
+
+length(matches$features)
+```
+
+ A "data cube" (x,y,time) is a common metaphor here.  An abstract may have a particular spatial and temporal resolution that need not match the underlying data -- for instance, satellite images may be taken every few days, but a cube may use monthly time step -- all images in this interval will then be averaged.  This can leverage clever things like first masking out clouds, such that the monthly average creates a 'cloudless' composite.  Similarly, spatial resolution can be lower (allowing for rapid computation and visualization) or higher (using a range of interpolation methods) than the underlying data.  Obviously analysts must be mindful of these effects.
+
+
+```{r}
+cube <- gdalcubes::stac_image_collection(matches$features, asset_names = "data")
+v <- cube_view(srs = "EPSG:4326",
+               extent = list(t0 = "2017-01-01", t1 = "2020-12-31",
+                             left = box[1], right = box[3],
+                             top = box[4], bottom = box[2]),
+               nx = 500, ny=500, dt = "P1Y")
+
+Q <- raster_cube(cube,v)
+```
+
+
+
+## Data Management
+
+This next step isn't strictly necessary, but can improve performance & reproducibility. 
+
+Initial data access operations can be slow, and sometimes we must access data manually from sources that do not provide publicly accessible or token-based access methods.  Data providers sometimes distribute data in formats that are more proprietary or limit performance. To maintain a fast and reproducible workflow, it is thus often helpful to stash a copy of our downloaded, subset, processed, and production ready data on cloud-based object store, publicly accessible when possible, and with controlled access tokens when required.  Issues of performance, cost, and data sovereignty may also preclude using commercial clouds.  Instead, we will use a high-performance, locally hosted open source platform (MINIO) running on an open-hardware System76 desktop:
+
+
+```{r}
+# provide passwords if needed. (NOT IN HERE, in .Renviron securely of course!)
+Sys.setenv("AWS_ACCESS_KEY_ID"=Sys.getenv("NVME_KEY")) 
+Sys.setenv("AWS_SECRET_ACCESS_KEY"=Sys.getenv("NVME_SECRET"))
+# We can use a self-hosted S3-like system. Cheaper and we don't have to trust AWS...
+Sys.setenv("AWS_S3_ENDPOINT"="minio.carlboettiger.info")
+Sys.setenv("AWS_VIRTUAL_HOSTING"="FALSE")
+```
+
+```{r}
+writeVector(gmw2017_india, "/vsis3/biodiversity/mangroves/GMW2017_india.fgb", "FlatGeobuf", overwrite=TRUE)
+writeVector(gmw2020_india, "/vsis3/biodiversity/mangroves/GMW2020_india.fgb", "FlatGeobuf", overwrite=TRUE)
+```
+
+(dev note: `sf` can write to virtual filesystem fine too)
+
+Currently streaming the geotiff to S3 in the R tooling is lacking. 
+Instead of writing the whole cube, we can write a few slices as single tifs and snyc them over to s3 manually
+
+```{r message=FALSE}
+Q |> gdalcubes::slice_time("2020-01-01") |> stars::st_as_stars("BII_2020_india.tif")
+Q |> gdalcubes::slice_time("2017-01-01") |> stars::st_as_stars("BII_2017_india.tif")
 ```
 
 
 ```{r}
-# We will use interactive Leaflet plots with HTML output
-tmap_options(check.and.fix = TRUE)
+# install_github("cboettig/minio")
+library(minio)
+mc_alias_set("minio")
+mc("cp BII_2020_india.tif BII_2017_india.tif minio/biodiversity/mangroves/")
+```
+
+
+
+## Visualization
+
+
+```{r}
+library(tmap)
+```
+
+
+```{r}
+gmw2017_india <- vect("/vsis3/biodiversity/mangroves/GMW2017_india.fgb") |> st_as_sf()
+gmw2020_india <- vect("/vsis3/biodiversity/mangroves/GMW2020_india.fgb") |> st_as_sf()
+
+bii_2017 <- rast("/vsis3/biodiversity/mangroves/BII_2017_india.tif")
+bii_2020 <- rast("/vsis3/biodiversity/mangroves/BII_2020_india.tif")
+
+```
+
+```{r}
 tmap_mode("view")
+tm_shape(bii_2020) + tm_raster(alpha = 0.8, palette="Greens") +
+tm_shape(gmw2020_india) + tm_polygons(alpha = 0.6) 
+
 ```
+# Analysis
+
+Let's introduce some simple computations on this data:
 
 ```{r}
-# Let's zoom in on a particular area with Mangroves
-# Note: the Global Mangrove Watch data is super-high spatial resolution polygons,
-# that really are best visualized up close
-india <- spData::world |> filter(name_long == "India")
+disjoint <- st_disjoint(gmw2017_india, gmw2020_india)
+intersection <- st_intesects(gmw2017_india, gmw2020_india)
 
-loc <- spData::world |> filter(name_long == "Sri Lanka")
-box <- st_bbox(loc)
-```
-
-
-```{r eval=FALSE}
-## subset from original data.
-sf_use_s2(FALSE) # Original data has misspecified spherical geometry actually...
-# internal URL
-kba_url <- "https://minio.carlboettiger.info/iucn/KBAsGlobal_2023_March_01_Criteria_TriggerSpecies.zip"
-kba_path <- "KBAsGlobal_2023_March_01_Criteria_TriggerSpecies/KBAsGlobal_2023_March_01_POL.shp"
-vsiz <- "/vsizip//vsicurl"
-kbas <- glue("{vsiz}/{kba_url}/{kba_path}") |> sf::read_sf() |> st_crop(loc) |> st_make_valid()
-sf_use_s2(TRUE)
-
-# Note Global Mangrove Watch Data we can access from their public AWS bucket:
-base_url <- "https://datadownload-production.s3.amazonaws.com"
-vsiz <- "/vsizip//vsicurl" # Virtual filesystem -- not in RAM, not downloaded
-gmw <- "GMW_v3_2015" # Let's start with the 2015 data
-
-mangroves2015_shp <- read_sf(glue("{vsiz}/{base_url}/{gmw}.zip")) |>
-  st_crop(loc)
-
-#write_sf(mangroves2015_shp, "srilanka_mangroves2015.json", driver="GeoJSON")
+gmw2017_india <- gmw2017_india |> mutate(area = st_area(geometry))
+gmw2020_india <- gmw2020_india |> mutate(area = st_area(geometry))
 
 ```
 
 ```{r}
-# a bit faster using cached subset layer
-biodiversity <- "https://minio.carlboettiger.info/biodiversity"
-kbas <- read_sf(paste0("/vsicurl/", biodiversity, "/", "srilanka_kba.json"))
-mangroves2015_shp <- read_sf(paste0("/vsicurl/", biodiversity, "/", "srilanka_mangroves2015.json"))
+bii_diff <- bii_2020 - bii_2017
+plot(bii_diff)
 ```
 
 
-Actual GBIF occurrances
-
-```{r}
-attach(as.list(box)) # NSE-filter
-
-s3 <- arrow::s3_bucket("biodiversity", endpoint_override="https://minio.carlboettiger.info", anonymous=TRUE)
-gbif <- arrow::open_dataset("gbif_richness")
-vertabrate_species_gbif <- gbif |>
-    dplyr::filter(latitude >= {ymin},
-         latitude <= {ymax},
-         longitude >= {xmin},
-         longitude <= {xmax}
-         ) |>
-  group_by(longitude, latitude) |> 
-  summarise(n = sum(n, na.rm=TRUE)) |> 
-  collect() |> 
-  tidyr::drop_na()  |>
-  stars::st_as_stars(coords=c("longitude", "latitude"))
-st_crs(vertabrate_species_gbif) <- st_crs(loc)
-
-```
-
-
-```{r}
-sri_2015_pop <- "https://data.worldpop.org/GIS/Population_Density/Global_2000_2020_1km_UNadj/2015/LKA/lka_pd_2015_1km_UNadj.tif"
-population <- stars::read_stars(paste0(sri_2015_pop))
-
-priority_areas <- kbas
-mangroves <- mangroves2015_shp 
-```
-
-```{r}
-tm_shape(population) + tm_raster(n = 20, palette = "viridis", 
-                                style="quantile", legend.show=FALSE, alpha=0.4) +
-tm_shape(vertabrate_species_gbif) + tm_raster(alpha=0.5) + 
-tm_shape(priority_areas) + tm_polygons(alpha=0) +
-tm_shape(mangroves) + tm_polygons("darkgreen")
-```
-
-
-Overlapping species distribution polygons
-
-```{r}
-reef_fish <- read_sf("/vsizip//vsicurl/https://minio.carlboettiger.info/iucn/WRASSES_PARROTFISHES.zip")
-sf_use_s2(FALSE) # Original data has misspecified spherical geometry actually...
-fish <- reef_fish |> st_crop(loc)
-sf_use_s2(TRUE) # Original data has misspecified spherical geometry actually...
-
-st_as_stars(st_bbox(loc), nx = 600, ny = 1200, values = 0) |> stars::write_stars("grid.tif")
-grd <- raster::raster("grid.tif")
-wrasses_richness <- RWmisc::overlap.weight(grd, fish, count = TRUE)
-
-```
-
-```{r}
-tm_shape(wrasses_richness) + tm_raster(palette="viridis", alpha=0.2)
-```
 
 
 
