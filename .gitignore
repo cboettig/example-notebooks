@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.tif
+*.zip
+*.json
+*.fgb
+*.gdb
+*.parquet
