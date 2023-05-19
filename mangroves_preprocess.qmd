@@ -7,7 +7,7 @@ format: html
 This is a tutorial showing a cloud-native workflow for spatial data processing.
 
 ```{r include=FALSE}
-knitr::opts_chunk$set(message=FALSE, warning = FALSE)
+knitr::opts_chunk$set(message=FALSE, warning = FALSE, cache=TRUE)
 ```
 
 ```{r setup, message=FALSE}

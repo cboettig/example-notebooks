@@ -161,6 +161,11 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="./mangroves_preprocess.html" class="sidebar-item-text sidebar-link">Mangroves - pre-processing</a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="./mangroves_plot.html" class="sidebar-item-text sidebar-link">Mangroves &amp; BII in India (demo)</a>
   </div>
 </li>
@@ -172,11 +177,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
           </a> 
       </div>
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="./drafts/carbon.html" class="sidebar-item-text sidebar-link">box &lt;- sf::st_transform(box, st_crs(r))</a>
-  </div>
-</li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./drafts/mangroves.html" class="sidebar-item-text sidebar-link">Mangroves and Environment in India</a>
@@ -235,7 +235,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </header>
 
 <p>This is a tutorial showing a cloud-native workflow for spatial data processing.</p>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/setup_1c56bed9762df4e8a45f08830b352c2a">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tmap)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(terra)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gdalcubes)</span>
@@ -249,13 +249,13 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <h1>Data access</h1>
 <section id="spatial-vectors" class="level2">
 <h2 class="anchored" data-anchor-id="spatial-vectors">Spatial vectors</h2>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/unnamed-chunk-2_1d08cf54416200fd489ab82dbaed733c">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>base <span class="ot">&lt;-</span> <span class="st">"https://datadownload-production.s3.amazonaws.com"</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>y2017 <span class="ot">&lt;-</span> <span class="st">"GMW_v3_2017.zip"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>y2020 <span class="ot">&lt;-</span> <span class="st">"GMW_v3_2020.zip"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Global Mangrove Watch polygons are stored in rather large zipped shapefiles on AWS. We can read them in directly over the network, subsetting on the fly to save RAM through use of GDAL’s virtual filesystem. Let’s grab the polygons in India for 2017 and 2020.</p>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/unnamed-chunk-3_5b5b8f7646bb3f78a4c48c4e7215d868">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(terra)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>india <span class="ot">&lt;-</span> spData<span class="sc">::</span>world <span class="sc">|&gt;</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(name_long <span class="sc">==</span> <span class="st">"India"</span>) <span class="sc">|&gt;</span> <span class="fu">vect</span>()</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -268,7 +268,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <section id="spatial-rasters" class="level2">
 <h2 class="anchored" data-anchor-id="spatial-rasters">Spatial Rasters</h2>
 <p>Raster data like images can also be challenging to work with. We commonly have to filter through collections with thousands of different files covering the globe at different times, and then tile together dozens or hundreds of individual tif files into a mosaic for a national scale analysis. To do this reproducibly and programmatically, we will search a STAC catalog (essentially a collection of JSON files) to identify which individual tif assets contain the spatial/temporal region of interest, and extract links. These links are automatically ‘signed’ to allow secure access – though in this case the data are freely available, so link signing is only a technique for the database to use rate-limiting to prevent overuse by a single user.</p>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/unnamed-chunk-4_842c30660d29d661620ed4b39afeb7cc">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rstac)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gdalcubes)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>box <span class="ot">&lt;-</span> spData<span class="sc">::</span>world <span class="sc">|&gt;</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(name_long <span class="sc">==</span> <span class="st">"India"</span>) <span class="sc">|&gt;</span> sf<span class="sc">::</span><span class="fu">st_bbox</span>()</span>
@@ -287,7 +287,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </div>
 </div>
 <p>A “data cube” (x,y,time) is a common metaphor here. An abstract may have a particular spatial and temporal resolution that need not match the underlying data – for instance, satellite images may be taken every few days, but a cube may use monthly time step – all images in this interval will then be averaged. This can leverage clever things like first masking out clouds, such that the monthly average creates a ‘cloudless’ composite. Similarly, spatial resolution can be lower (allowing for rapid computation and visualization) or higher (using a range of interpolation methods) than the underlying data. Obviously analysts must be mindful of these effects.</p>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/unnamed-chunk-5_8cd652daa15771d7a1e64e40f3de6294">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>cube <span class="ot">&lt;-</span> gdalcubes<span class="sc">::</span><span class="fu">stac_image_collection</span>(matches<span class="sc">$</span>features, <span class="at">asset_names =</span> <span class="st">"data"</span>)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>v <span class="ot">&lt;-</span> <span class="fu">cube_view</span>(<span class="at">srs =</span> <span class="st">"EPSG:4326"</span>,</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>               <span class="at">extent =</span> <span class="fu">list</span>(<span class="at">t0 =</span> <span class="st">"2017-01-01"</span>, <span class="at">t1 =</span> <span class="st">"2020-12-31"</span>,</span>
@@ -302,7 +302,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <h2 class="anchored" data-anchor-id="data-management">Data Management</h2>
 <p>This next step isn’t strictly necessary, but can improve performance &amp; reproducibility.</p>
 <p>Initial data access operations can be slow, and sometimes we must access data manually from sources that do not provide publicly accessible or token-based access methods. Data providers sometimes distribute data in formats that are more proprietary or limit performance. To maintain a fast and reproducible workflow, it is thus often helpful to stash a copy of our downloaded, subset, processed, and production ready data on cloud-based object store, publicly accessible when possible, and with controlled access tokens when required. Issues of performance, cost, and data sovereignty may also preclude using commercial clouds. Instead, we will use a high-performance, locally hosted open source platform (MINIO) running on an open-hardware System76 desktop:</p>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/unnamed-chunk-6_1bf344da86a336c35a9b5c86c09cb780">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># provide passwords if needed. (NOT IN HERE, securely in .Renviron of course!)</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="st">"AWS_ACCESS_KEY_ID"</span><span class="ot">=</span><span class="fu">Sys.getenv</span>(<span class="st">"NVME_KEY"</span>)) </span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="st">"AWS_SECRET_ACCESS_KEY"</span><span class="ot">=</span><span class="fu">Sys.getenv</span>(<span class="st">"NVME_SECRET"</span>))</span>
@@ -314,12 +314,12 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># extra option required to write tif to S3</span></span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="st">"CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE"</span><span class="ot">=</span><span class="st">"YES"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/unnamed-chunk-7_a2faae27e90944ba5d500cdf68cec071">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">writeVector</span>(gmw2017_india, <span class="st">"/vsis3/biodiversity/mangroves/GMW2017_india.fgb"</span>, <span class="st">"FlatGeobuf"</span>, <span class="at">overwrite=</span><span class="cn">TRUE</span>)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">writeVector</span>(gmw2020_india, <span class="st">"/vsis3/biodiversity/mangroves/GMW2020_india.fgb"</span>, <span class="st">"FlatGeobuf"</span>, <span class="at">overwrite=</span><span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>(dev note: <code>sf</code> can write to virtual filesystem fine too)</p>
-<div class="cell">
+<div class="cell" data-hash="mangroves_preprocess_cache/html/unnamed-chunk-8_f6234b64d6548010cc386348a4ff516f">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>Q <span class="sc">|&gt;</span> gdalcubes<span class="sc">::</span><span class="fu">slice_time</span>(<span class="st">"2020-01-01"</span>) <span class="sc">|&gt;</span> stars<span class="sc">::</span><span class="fu">st_as_stars</span>() <span class="sc">|&gt;</span> </span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_stars</span>(<span class="st">"/vsis3/biodiversity/mangroves/BII_2020_india_2k.tif"</span>)</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>Q <span class="sc">|&gt;</span> gdalcubes<span class="sc">::</span><span class="fu">slice_time</span>(<span class="st">"2017-01-01"</span>) <span class="sc">|&gt;</span> stars<span class="sc">::</span><span class="fu">st_as_stars</span>() <span class="sc">|&gt;</span> </span>

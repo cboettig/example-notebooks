@@ -6,7 +6,10 @@ website:
   sidebar:
     contents: auto
     search: true
-
+  repo-url: https://github.com/cboettig/example-notebooks
+  repo-actions: [edit, issue]
+  
+  
 #      - section: "Mangroves Example"
 #        contents:
 #          - mangroves_preprocess.qmd

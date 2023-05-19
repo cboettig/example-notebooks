@@ -4,10 +4,13 @@ format: html
 
 ---
 
+A demonstration leaflet map showing polygons from [Global Mangrove Watch](globalmangrovewatch.org) (GMW) 2020 data overlaid with the 2020 values and change since 2017 in Impact Observatory's [Biodiversity Intactness Index](https://planetarycomputer.microsoft.com/dataset/io-biodiversity).  
 
+Zoom in on coastal areas to see individual polygons.  Use the layer toggle to turn layers off.  The OpenStreetMap basemap is helpful as it documents protected areas (even adds mangrove icons), which do not always quite match those of GMW.  
 
 ```{r include=FALSE}
-knitr::opts_chunk$set(message=FALSE, warning = FALSE, echo = FALSE)
+knitr::opts_chunk$set(message=FALSE, warning = FALSE,
+                      echo = FALSE, cache = TRUE)
 ```
 
 ```{r setup, message=FALSE}
@@ -51,7 +54,8 @@ A map of [Biodiversity Intactness Index]
 tmap_mode("view")
 tmap_options("max.raster" = c(plot=1e6, view=4e6))
 map <- 
-  tm_shape(bii_diff, raster.downsample = ) + tm_raster(alpha = 0.8) +
+  tm_shape(bii_2020) + tm_raster(alpha = 0.8, palette="Greens") + 
+  tm_shape(bii_diff) + tm_raster(alpha = 0.75) +
   tm_shape(gmw2020_india) + tm_polygons(alpha = 0.5) 
 
 map
