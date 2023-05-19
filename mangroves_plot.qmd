@@ -1,5 +1,5 @@
 ---
-title: Mangroves and Environment in India
+title: Mangroves & BII in India (demo)
 format: html
 
 ---
@@ -33,6 +33,7 @@ Sys.setenv("CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE"="YES")
 
 
 ```{r}
+# Read from S3 bucket on personal MINIO server
 gmw2017_india <- vect("/vsis3/biodiversity/mangroves/GMW2017_india.fgb") |> st_as_sf()
 gmw2020_india <- vect("/vsis3/biodiversity/mangroves/GMW2020_india.fgb") |> st_as_sf()
 bii_2017 <- rast("/vsis3/biodiversity/mangroves/BII_2017_india_2k.tif")
@@ -40,12 +41,11 @@ bii_2020 <- rast("/vsis3/biodiversity/mangroves/BII_2020_india_2k.tif")
 
 ```
 
-We can do calculations on the fly, e.g. let's focus on changes in BII:
-
 ```{r}
 bii_diff <- bii_2020 - bii_2017
 ```
 
+A map of [Biodiversity Intactness Index]
 
 ```{r}
 tmap_mode("view")

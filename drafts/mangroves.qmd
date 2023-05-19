@@ -1,0 +1,199 @@
+---
+title: Mangroves and Environment in India
+format: html
+
+---
+
+This is a tutorial showing a cloud-native workflow for spatial data processing.
+
+```{r include=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning = FALSE, eval=FALSE)
+```
+
+```{r setup, message=FALSE}
+library(tmap)
+library(terra)
+library(gdalcubes)
+library(stars)
+library(sf)
+library(dplyr)
+library(glue)
+library(spData)
+```
+
+# Data access
+
+## Spatial vectors
+
+```{r}
+base <- "https://datadownload-production.s3.amazonaws.com"
+y2017 <- "GMW_v3_2017.zip"
+y2020 <- "GMW_v3_2020.zip"
+```
+
+Global Mangrove Watch polygons are stored in rather large zipped shapefiles on AWS.  We can read them in directly over the network, subsetting on the fly to save RAM through use of GDAL's virtual filesystem.  Let's grab the polygons in India for 2017 and 2020.  
+
+```{r}
+library(terra)
+india <- spData::world |> dplyr::filter(name_long == "India") |> vect()
+
+
+gmw2017_india <- glue("/vsizip/vsicurl/{base}/{y2017}") |> vect(filter = india)
+gmw2020_india <-glue("/vsizip/vsicurl/{base}/{y2020}") |> vect(filter = india)
+```
+
+We will come back to these in a moment.  (dev note: `sf` version of this filter uses much more RAM)
+
+
+## Spatial Rasters
+
+Raster data like images can also be challenging to work with.  We commonly have to filter through collections with thousands of different files covering the globe at different times, and then tile together dozens or hundreds of individual tif files into a mosaic for a national scale analysis. To do this reproducibly and programmatically, we will search a STAC catalog (essentially a collection of JSON files) to identify which individual tif assets contain the spatial/temporal region of interest, and extract links.  These links are automatically 'signed' to allow secure access -- though in this case the data are freely available, so link signing is only a technique for the database to use rate-limiting to prevent overuse by a single user. 
+
+```{r}
+library(rstac)
+library(gdalcubes)
+box <- spData::world |> dplyr::filter(name_long == "India") |> sf::st_bbox()
+
+matches <-
+  stac("https://planetarycomputer.microsoft.com/api/stac/v1") |>
+  stac_search(collections = "io-biodiversity",
+              bbox = c(box),
+              limit = 1000) |>
+  post_request() |>
+  items_sign(sign_fn = sign_planetary_computer())
+
+length(matches$features)
+
+```
+
+ A "data cube" (x,y,time) is a common metaphor here.  An abstract may have a particular spatial and temporal resolution that need not match the underlying data -- for instance, satellite images may be taken every few days, but a cube may use monthly time step -- all images in this interval will then be averaged.  This can leverage clever things like first masking out clouds, such that the monthly average creates a 'cloudless' composite.  Similarly, spatial resolution can be lower (allowing for rapid computation and visualization) or higher (using a range of interpolation methods) than the underlying data.  Obviously analysts must be mindful of these effects.
+
+
+```{r, message=FALSE}
+cube <- gdalcubes::stac_image_collection(matches$features, asset_names = "data")
+v <- cube_view(srs = "EPSG:4326",
+               extent = list(t0 = "2017-01-01", t1 = "2020-12-31",
+                             left = box[1], right = box[3],
+                             top = box[4], bottom = box[2]),
+               nx = 500, ny=500, dt = "P1Y")
+
+Q <- raster_cube(cube,v)
+```
+
+
+## Data Management
+
+This next step isn't strictly necessary, but can improve performance & reproducibility. 
+
+Initial data access operations can be slow, and sometimes we must access data manually from sources that do not provide publicly accessible or token-based access methods.  Data providers sometimes distribute data in formats that are more proprietary or limit performance. To maintain a fast and reproducible workflow, it is thus often helpful to stash a copy of our downloaded, subset, processed, and production ready data on cloud-based object store, publicly accessible when possible, and with controlled access tokens when required.  Issues of performance, cost, and data sovereignty may also preclude using commercial clouds.  Instead, we will use a high-performance, locally hosted open source platform (MINIO) running on an open-hardware System76 desktop:
+
+
+```{r}
+# provide passwords if needed. (NOT IN HERE, securely in .Renviron of course!)
+Sys.setenv("AWS_ACCESS_KEY_ID"=Sys.getenv("NVME_KEY")) 
+Sys.setenv("AWS_SECRET_ACCESS_KEY"=Sys.getenv("NVME_SECRET"))
+
+# We can use a self-hosted S3-like system. Cheaper and we don't have to trust AWS...
+Sys.setenv("AWS_S3_ENDPOINT"="minio.carlboettiger.info")
+Sys.setenv("AWS_VIRTUAL_HOSTING"="FALSE")
+
+# extra option required to write tif to S3
+Sys.setenv("CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE"="YES") 
+```
+
+```{r}
+writeVector(gmw2017_india, "/vsis3/biodiversity/mangroves/GMW2017_india.fgb", "FlatGeobuf", overwrite=TRUE)
+writeVector(gmw2020_india, "/vsis3/biodiversity/mangroves/GMW2020_india.fgb", "FlatGeobuf", overwrite=TRUE)
+```
+
+(dev note: `sf` can write to virtual filesystem fine too)
+
+```{r message=FALSE}
+Q |> gdalcubes::slice_time("2020-01-01") |> stars::st_as_stars() |> 
+  write_stars("/vsis3/biodiversity/mangroves/BII_2020_india.tif")
+Q |> gdalcubes::slice_time("2017-01-01") |> stars::st_as_stars() |> 
+    write_stars("/vsis3/biodiversity/mangroves/BII_2017_india.tif")
+```
+
+
+
+## Visualization
+
+
+
+If we have stashed copies in our S3 system, we can quickly grab those:
+
+```{r}
+gmw2017_india <- vect("/vsis3/biodiversity/mangroves/GMW2017_india.fgb") |> st_as_sf()
+gmw2020_india <- vect("/vsis3/biodiversity/mangroves/GMW2020_india.fgb") |> st_as_sf()
+bii_2017 <- rast("/vsis3/biodiversity/mangroves/BII_2017_india.tif")
+bii_2020 <- rast("/vsis3/biodiversity/mangroves/BII_2020_india.tif")
+
+```
+
+We can do calculations on the fly, e.g. let's focus on changes in BII:
+
+```{r}
+bii_diff <- bii_2020 - bii_2017
+```
+
+
+```{r}
+tmap_mode("view")
+tmap_options("max.raster" = c(plot=1e6, view=4e6))
+map <- 
+  tm_shape(bii_diff, raster.downsample = ) + tm_raster(alpha = 0.8) +
+  tm_shape(gmw2020_india) + tm_polygons(alpha = 0.5) 
+
+map
+```
+
+
+--------
+
+
+# Analysis
+
+
+## Vectors
+
+We have a rich set of spatially explicit, projection aware computations we can do.  
+
+```{r}
+gmw2017_india <- gmw2017_india |> mutate(area = st_area(geometry))
+gmw2020_india <- gmw2020_india |> mutate(area = st_area(geometry))
+
+delta_area <- sum(gmw2017_india$area) - sum(gmw2020_india$area)
+delta_area
+
+delta_area / sum(gmw2017_india$area)
+```
+About 2% of the total area lost in 3 years.  
+
+Of course many richer operations are possible, such as intersections of polygons, etc.  A common strategy with high resolution polygons is to "simplify" by removing vertices. note this has notable consequence for the areas covered --  a 50m tolerance gives a 2% change to total area, while a 500m tolerance creates a whopping 19% change in area.
+
+```{r}
+gmw <- gmw2020_india |>st_simplify(dTolerance = 50) 
+
+gmw <- gmw |> mutate(area_simple = st_area(geometry),
+                     area_diff = area - area_simple)
+
+sum(gmw$area_diff) / sum(gmw$area)
+```
+
+
+```{r}
+tm_shape(gmw2020_india) + tm_polygons(alpha = 0.5) +
+tm_shape(gmw) + tm_polygons(alpha = 0.5, fill="blue") 
+```
+
+
+
+## Raster operations
+
+```{r}
+bii_diff <- bii_2020 - bii_2017
+```
+
+
+

@@ -1,12 +1,13 @@
 project:
   type: website
   output-dir: docs
-website:  
+website:
+  title: example notebooks
   sidebar:
-    style: "docked"
+    contents: auto
     search: true
-    contents:
-      - section: "Mangroves Example"
-        contents:
-          - mangroves_preprocess.qmd
-          - mangroves_plot.qmd
+
+#      - section: "Mangroves Example"
+#        contents:
+#          - mangroves_preprocess.qmd
+#          - mangroves_plot.qmd
