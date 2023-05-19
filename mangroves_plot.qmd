@@ -10,7 +10,7 @@ Zoom in on coastal areas to see individual polygons.  Use the layer toggle to tu
 
 ```{r include=FALSE}
 knitr::opts_chunk$set(message=FALSE, warning = FALSE,
-                      echo = FALSE, cache = TRUE)
+                      echo = FALSE, cache = FALSE)
 ```
 
 ```{r setup, message=FALSE}
@@ -48,7 +48,6 @@ bii_2020 <- rast("/vsis3/biodiversity/mangroves/BII_2020_india_2k.tif")
 bii_diff <- bii_2020 - bii_2017
 ```
 
-A map of [Biodiversity Intactness Index]
 
 ```{r}
 tmap_mode("view")
