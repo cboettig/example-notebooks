@@ -8,3 +8,5 @@
 *.fgb
 *.gdb
 *.parquet
+/.quarto/
+*_cache

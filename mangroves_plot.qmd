@@ -1,0 +1,58 @@
+---
+title: Mangroves and Environment in India
+format: html
+
+---
+
+
+
+```{r include=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning = FALSE, echo = FALSE)
+```
+
+```{r setup, message=FALSE}
+library(tmap)
+library(terra)
+library(stars)
+library(sf)
+```
+
+
+```{r}
+# provide passwords if needed. (NOT IN HERE, securely in .Renviron of course!)
+Sys.setenv("AWS_ACCESS_KEY_ID"=Sys.getenv("NVME_KEY")) 
+Sys.setenv("AWS_SECRET_ACCESS_KEY"=Sys.getenv("NVME_SECRET"))
+
+# We can use a self-hosted S3-like system. Cheaper and we don't have to trust AWS...
+Sys.setenv("AWS_S3_ENDPOINT"="minio.carlboettiger.info")
+Sys.setenv("AWS_VIRTUAL_HOSTING"="FALSE")
+
+# extra option required to write tif to S3
+Sys.setenv("CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE"="YES") 
+```
+
+
+```{r}
+gmw2017_india <- vect("/vsis3/biodiversity/mangroves/GMW2017_india.fgb") |> st_as_sf()
+gmw2020_india <- vect("/vsis3/biodiversity/mangroves/GMW2020_india.fgb") |> st_as_sf()
+bii_2017 <- rast("/vsis3/biodiversity/mangroves/BII_2017_india_2k.tif")
+bii_2020 <- rast("/vsis3/biodiversity/mangroves/BII_2020_india_2k.tif")
+
+```
+
+We can do calculations on the fly, e.g. let's focus on changes in BII:
+
+```{r}
+bii_diff <- bii_2020 - bii_2017
+```
+
+
+```{r}
+tmap_mode("view")
+tmap_options("max.raster" = c(plot=1e6, view=4e6))
+map <- 
+  tm_shape(bii_diff, raster.downsample = ) + tm_raster(alpha = 0.8) +
+  tm_shape(gmw2020_india) + tm_polygons(alpha = 0.5) 
+
+map
+```

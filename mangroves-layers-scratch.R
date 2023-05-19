@@ -87,3 +87,51 @@ kba_path <- "/KBAsGlobal_2023_March_01_Criteria_TriggerSpecies/KBAsGlobal_2023_M
 
 kbas <- sf::read_sf(paste0("/vsizip//vsicurl/", kba_url, kba_path))
 
+
+library(sf)
+mangroves_2015 = "/vsizip/vsicurl/https://datadownload-production.s3.amazonaws.com/GMW_v3_2015.zip"
+loc <- spData::world |> dplyr::filter(name_long == "India")
+wkt = st_as_text(st_geometry(loc))
+m2015 <- st_read(mangroves_2015, wkt_filter = wkt)
+plot(m2015)
+  
+
+
+
+library(sf)
+mangroves_2015 = "/vsizip/vsicurl/https://datadownload-production.s3.amazonaws.com/GMW_v3_2015.zip"
+bench::bench_time({
+  st_read(mangroves_2015) |> plot()
+  
+})
+
+
+library(sf)
+library(tmap)
+tmap_mode("view")
+mangroves_2015 = "/vsizip/vsicurl/https://datadownload-production.s3.amazonaws.com/GMW_v3_2015.zip"
+bench::bench_time({
+  loc <- spData::world |> dplyr::filter(name_long == "Sri Lanka")
+  m <- st_read(mangroves_2015)
+  map <- tm_shape(m, bbox=loc) + tm_polygons()
+  print(map)
+})
+
+
+
+library(terra)
+mangroves_2015 = "/vsizip/vsicurl/https://datadownload-production.s3.amazonaws.com/GMW_v3_2015.zip"
+bench::bench_time({
+  vect(mangroves_2015) |> plot()
+  
+})
+
+
+
+library(sf)
+mangroves_2015 = "GMW_v3_2015.zip"
+bench::bench_time({
+  st_read(mangroves_2015) |> plot()
+  
+})
+

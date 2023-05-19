@@ -36,6 +36,8 @@ Global Mangrove Watch polygons are stored in rather large zipped shapefiles on A
 ```{r}
 library(terra)
 india <- spData::world |> dplyr::filter(name_long == "India") |> vect()
+
+
 gmw2017_india <- glue("/vsizip/vsicurl/{base}/{y2017}") |> vect(filter = india)
 gmw2020_india <-glue("/vsizip/vsicurl/{base}/{y2020}") |> vect(filter = india)
 ```
@@ -61,6 +63,7 @@ matches <-
   items_sign(sign_fn = sign_planetary_computer())
 
 length(matches$features)
+
 ```
 
  A "data cube" (x,y,time) is a common metaphor here.  An abstract may have a particular spatial and temporal resolution that need not match the underlying data -- for instance, satellite images may be taken every few days, but a cube may use monthly time step -- all images in this interval will then be averaged.  This can leverage clever things like first masking out clouds, such that the monthly average creates a 'cloudless' composite.  Similarly, spatial resolution can be lower (allowing for rapid computation and visualization) or higher (using a range of interpolation methods) than the underlying data.  Obviously analysts must be mindful of these effects.
@@ -72,7 +75,7 @@ v <- cube_view(srs = "EPSG:4326",
                extent = list(t0 = "2017-01-01", t1 = "2020-12-31",
                              left = box[1], right = box[3],
                              top = box[4], bottom = box[2]),
-               nx = 2000, ny=2000, dt = "P1Y")
+               nx = 500, ny=500, dt = "P1Y")
 
 Q <- raster_cube(cube,v)
 ```
@@ -107,9 +110,9 @@ writeVector(gmw2020_india, "/vsis3/biodiversity/mangroves/GMW2020_india.fgb", "F
 
 ```{r message=FALSE}
 Q |> gdalcubes::slice_time("2020-01-01") |> stars::st_as_stars() |> 
-  write_stars("/vsis3/biodiversity/mangroves/BII_2020_india_2k.tif")
+  write_stars("/vsis3/biodiversity/mangroves/BII_2020_india.tif")
 Q |> gdalcubes::slice_time("2017-01-01") |> stars::st_as_stars() |> 
-    write_stars("/vsis3/biodiversity/mangroves/BII_2017_india_2k.tif")
+    write_stars("/vsis3/biodiversity/mangroves/BII_2017_india.tif")
 ```
 
 
@@ -123,8 +126,8 @@ If we have stashed copies in our S3 system, we can quickly grab those:
 ```{r}
 gmw2017_india <- vect("/vsis3/biodiversity/mangroves/GMW2017_india.fgb") |> st_as_sf()
 gmw2020_india <- vect("/vsis3/biodiversity/mangroves/GMW2020_india.fgb") |> st_as_sf()
-bii_2017 <- rast("/vsis3/biodiversity/mangroves/BII_2017_india_2k.tif")
-bii_2020 <- rast("/vsis3/biodiversity/mangroves/BII_2020_india_2k.tif")
+bii_2017 <- rast("/vsis3/biodiversity/mangroves/BII_2017_india.tif")
+bii_2020 <- rast("/vsis3/biodiversity/mangroves/BII_2020_india.tif")
 
 ```
 
