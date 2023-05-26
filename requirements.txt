@@ -38,6 +38,7 @@ folium==0.13.0
 fonttools==4.39.3
 fqdn==1.5.1
 fsspec==2023.5.0
+gcs-helpers==0.0.0.24
 GDAL==3.4.1
 gdown==4.7.1
 geogif==0.1.4
@@ -48,6 +49,7 @@ GitPython==3.1.31
 Glances==3.4.0.2
 gyp==0.1
 idna==3.4
+-e git+https://github.com/brookisme/imagebox.git@2943ca7081db162155c0751d92212fd20982b0d3#egg=imagebox
 importlib-metadata==6.6.0
 ipyevents==2.0.1
 ipyfilechooser==0.6.0
@@ -130,6 +132,7 @@ rasterio==1.3.6
 requests==2.29.0
 rfc3339-validator==0.1.4
 rfc3986-validator==0.1.1
+rioxarray==0.14.1
 scooby==0.7.2
 Send2Trash==1.8.2
 shapely==2.0.1
