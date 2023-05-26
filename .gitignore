@@ -10,3 +10,5 @@
 *.parquet
 /.quarto/
 *_cache
+*checkpoints
+
