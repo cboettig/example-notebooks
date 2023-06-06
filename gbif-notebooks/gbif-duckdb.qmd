@@ -1,5 +1,6 @@
 ---
-format: gfm
+format: html
+title: gbif in R
 ---
 
 ```{r include=FALSE}
