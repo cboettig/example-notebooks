@@ -1,0 +1,122 @@
+---
+
+---
+
+
+```{python}
+import os
+os.unsetenv("AWS_SECRET_ACCESS_KEY")
+os.unsetenv("AWS_ACCESS_KEY_ID")
+```
+
+# pyarrow
+
+```{python}
+```
+
+# pola.rs
+
+```{python}
+import polars as pl
+import pyarrow.dataset as ds
+date = "2020-09-24"
+bucket = "bio230014-bucket01"
+path = f"neon4cast-drivers/noaa/gefs-v12/stage1/reference_datetime={date}"
+endpoint = "https://sdsc.osn.xsede.org"
+uri = f"s3://{bucket}/{path}?endpoint_override={endpoint}"
+dataset = ds.dataset(uri)
+df = pl.scan_pyarrow_dataset(dataset)
+#df.filter(pl.col("variable")=="TMP").collect()
+```
+
+
+pola.rs can also use duckdb:
+
+
+# ibis + duckdb
+
+```{python}
+```
+
+
+# duckdb
+
+```{python}
+import duckdb
+
+endpoint="sdsc.osn.xsede.org"
+con = duckdb.connect()
+con.execute(f'''
+INSTALL httpfs;
+LOAD httpfs;
+SET s3_url_style='path';
+SET s3_endpoint='{endpoint}';
+''')
+```
+
+
+```{python}
+date = "2020-09-24"
+bucket = "bio230014-bucket01"
+path = f"neon4cast-drivers/noaa/gefs-v12/stage1/reference_datetime={date}"
+uri = f"s3://{bucket}/{path}/*/*"
+
+query = f"""
+SELECT * FROM read_parquet("{uri}")
+WHERE variable ='TMP'
+"""
+
+con.execute(query)
+```
+
+
+```{python}
+query = f"""
+from s3
+filter variable == TMP
+"""
+import prql_python as prql
+
+q = prql.compile(query)
+duckdb.execute(q)
+```
+
+
+
+
+
+
+
+
+
+```{r}
+library(glue)
+library(duckdb)
+con = dbConnect(duckdb())
+
+endpoint="sdsc.osn.xsede.org"
+
+dbExecute(con, glue("
+INSTALL httpfs;
+LOAD httpfs;
+SET s3_url_style='path';
+SET s3_endpoint='{endpoint}';
+"))
+```
+
+```{r}
+date = "2020-09-24"
+bucket = "bio230014-bucket01"
+
+path = glue("neon4cast-drivers/noaa/gefs-v12/stage1/reference_datetime={date}")
+uri = glue("s3://{bucket}/{path}/*/*.parquet")
+
+query = glue("
+SELECT * FROM read_parquet('{uri}')
+WHERE (variable ='TMP')")
+
+#df = dbGetQuery(con, query)
+
+#library(dplyr)
+#tbl(con)
+```
